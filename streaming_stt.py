@@ -59,19 +59,21 @@ def listen_print_loop(responses, output_file="live_transcript.txt"):
     process = psutil.Process()
     peak_memory = 0
     cpu_snapshots = []
-    ram_snapshots = []  # NEW: Track RAM %
+    ram_snapshots = []
     final_latencies = []
     total_transcribed_time = 0
+
+    start_time = time.time()
 
     print(f"\n📝 Writing transcript to: {output_file}")
     with open(output_file, "w") as f:
         try:
             for response in responses:
-                memory = process.memory_info().rss / (1024 * 1024)  # MB
-                memory_percent = process.memory_percent()           # NEW
+                memory = process.memory_info().rss / (1024 * 1024)
+                memory_percent = process.memory_percent()
                 cpu = process.cpu_percent(interval=0.1)
                 cpu_snapshots.append(cpu)
-                ram_snapshots.append(memory_percent)               # NEW
+                ram_snapshots.append(memory_percent)
                 peak_memory = max(peak_memory, memory)
 
                 if not response.results:
@@ -84,22 +86,23 @@ def listen_print_loop(responses, output_file="live_transcript.txt"):
                 transcript = result.alternatives[0].transcript
 
                 if result.is_final:
-                    latency_start = time.time()
                     print(f"✅ Final: {transcript}")
                     f.write(transcript + "\n")
                     f.flush()
-                    latency_end = time.time()
-                    final_latencies.append(latency_end - latency_start)
-                    total_transcribed_time += 1.0
+
+                    result_duration = result.result_end_time.total_seconds()
+                    latency = time.time() - start_time - result_duration
+                    final_latencies.append(latency)
+                    total_transcribed_time += result_duration
                 else:
                     print(f"⏳ Interim: {transcript}", end="\r")
         except KeyboardInterrupt:
             print("\n⛔ Transcription stopped by user.")
         finally:
-            elapsed_time = sum(final_latencies) if final_latencies else 1
+            elapsed_time = time.time() - start_time
             avg_latency = sum(final_latencies) / len(final_latencies) if final_latencies else 0
             avg_cpu = sum(cpu_snapshots) / len(cpu_snapshots) if cpu_snapshots else 0
-            avg_ram = sum(ram_snapshots) / len(ram_snapshots) if ram_snapshots else 0  # NEW
+            avg_ram = sum(ram_snapshots) / len(ram_snapshots) if ram_snapshots else 0
             real_time_factor = elapsed_time / total_transcribed_time if total_transcribed_time else 0
 
             print("\n🧠 Resource Usage Summary:")
@@ -108,7 +111,7 @@ def listen_print_loop(responses, output_file="live_transcript.txt"):
             print(f"⏳ Avg Latency per Final Result: {avg_latency:.2f}s")
             print(f"📈 Peak Memory Usage: {peak_memory:.2f} MB")
             print(f"⚙️ Average CPU Usage: {avg_cpu:.2f}%")
-            print(f"🧮 Average RAM Usage: {avg_ram:.2f}%")  # NEW
+            print(f"🧮 Average RAM Usage: {avg_ram:.2f}%")
 
             with open("resource_log.txt", "w") as log:
                 log.write(f"Total Processing Time: {elapsed_time:.2f}s\n")
@@ -116,9 +119,7 @@ def listen_print_loop(responses, output_file="live_transcript.txt"):
                 log.write(f"Avg Latency per Result: {avg_latency:.2f}s\n")
                 log.write(f"Peak Memory: {peak_memory:.2f} MB\n")
                 log.write(f"Average CPU: {avg_cpu:.2f}%\n")
-                log.write(f"Average RAM: {avg_ram:.2f}%\n")  # NEW
-
-
+                log.write(f"Average RAM: {avg_ram:.2f}%\n")
 
 def main():
     client = speech.SpeechClient()
