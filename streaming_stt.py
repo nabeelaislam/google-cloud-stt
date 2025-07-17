@@ -65,6 +65,7 @@ def listen_print_loop(responses, output_file="live_transcript.txt"):
     print(f"\n📝 Writing transcript to: {output_file}")
     with open(output_file, "w") as f:
         try:
+            start_time = time.time()
             for response in responses:
                 memory = process.memory_info().rss / (1024 * 1024)
                 cpu = process.cpu_percent(interval=0.1)
@@ -80,14 +81,13 @@ def listen_print_loop(responses, output_file="live_transcript.txt"):
 
                 transcript = result.alternatives[0].transcript
 
-                if result.is_final:
-                    latency_start = time.time()
+                 if result.is_final:
+                    latency = time.time() - start_time
+                    final_latencies.append(latency)
+                    start_time = time.time()  # ← reset for next result
                     print(f"✅ Final: {transcript}")
                     f.write(transcript + "\n")
                     f.flush()
-                    latency_end = time.time()
-                    final_latencies.append(latency_end - latency_start)
-                    total_transcribed_time += 1.0
                 else:
                     print(f"⏳ Interim: {transcript}", end="\r")
         except KeyboardInterrupt:
