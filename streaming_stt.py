@@ -53,17 +53,25 @@ class MicrophoneStream:
                     break
             yield b"".join(data)
 
-def listen_print_loop(responses):
-    for response in responses:
-        if not response.results:
-            continue
-        result = response.results[0]
-        if not result.alternatives:
-            continue
-        transcript = result.alternatives[0].transcript
-        print(f"📝 Transcript: {transcript}")
-        if result.is_final:
-            print("✅ Final: ", transcript)
+def listen_print_loop(responses, output_file="transcript.txt"):
+    print(f"\n📝 Writing transcript to: {output_file}")
+    with open(output_file, "w") as f:
+        for response in responses:
+            if not response.results:
+                continue
+
+            result = response.results[0]
+            if not result.alternatives:
+                continue
+
+            transcript = result.alternatives[0].transcript
+
+            if result.is_final:
+                print(f"✅ Final: {transcript}")
+                f.write(transcript + "\n")
+                f.flush()
+            else:
+                print(f"⏳ Interim: {transcript}", end="\r")
 
 def main():
     client = speech.SpeechClient()
@@ -87,7 +95,8 @@ def main():
         )
 
         responses = client.streaming_recognize(streaming_config, requests)
-        listen_print_loop(responses)
+        listen_print_loop(responses, output_file="live_transcript.txt")
+
 
 if __name__ == "__main__":
     main()
