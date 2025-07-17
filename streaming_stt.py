@@ -81,7 +81,7 @@ def listen_print_loop(responses, output_file="live_transcript.txt"):
 
                 transcript = result.alternatives[0].transcript
 
-                 if result.is_final:
+                if result.is_final:
                     latency = time.time() - start_time
                     final_latencies.append(latency)
                     start_time = time.time()  # ← reset for next result
