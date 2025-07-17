@@ -1,5 +1,7 @@
 import os
 import pyaudio
+import psutil
+import time
 from six.moves import queue
 from google.cloud import speech
 
@@ -53,10 +55,22 @@ class MicrophoneStream:
                     break
             yield b"".join(data)
 
-def listen_print_loop(responses, output_file="transcript.txt"):
+def listen_print_loop(responses, output_file="live_transcript.txt"):
+    process = psutil.Process()
+    peak_memory = 0
+    cpu_snapshots = []
+    final_latencies = []
+    total_transcribed_time = 0  # Estimate: 1s per final result
+
     print(f"\n📝 Writing transcript to: {output_file}")
     with open(output_file, "w") as f:
         for response in responses:
+            # Track memory and CPU
+            memory = process.memory_info().rss / (1024 * 1024)  # MB
+            cpu = process.cpu_percent(interval=0.1)
+            cpu_snapshots.append(cpu)
+            peak_memory = max(peak_memory, memory)
+
             if not response.results:
                 continue
 
@@ -67,11 +81,34 @@ def listen_print_loop(responses, output_file="transcript.txt"):
             transcript = result.alternatives[0].transcript
 
             if result.is_final:
+                latency_start = time.time()
                 print(f"✅ Final: {transcript}")
                 f.write(transcript + "\n")
                 f.flush()
+                latency_end = time.time()
+                final_latencies.append(latency_end - latency_start)
+                total_transcribed_time += 1.0
             else:
                 print(f"⏳ Interim: {transcript}", end="\r")
+
+    elapsed_time = sum(final_latencies) if final_latencies else 1
+    avg_latency = sum(final_latencies) / len(final_latencies) if final_latencies else 0
+    avg_cpu = sum(cpu_snapshots) / len(cpu_snapshots) if cpu_snapshots else 0
+    real_time_factor = elapsed_time / total_transcribed_time if total_transcribed_time else 0
+
+    print("\n🧠 Resource Usage Summary:")
+    print(f"⏱️ Total Processing Time: {elapsed_time:.2f}s")
+    print(f"🧪 Real-Time Factor (RTF): {real_time_factor:.2f}")
+    print(f"⏳ Avg Latency per Final Result: {avg_latency:.2f}s")
+    print(f"📈 Peak Memory Usage: {peak_memory:.2f} MB")
+    print(f"⚙️ Average CPU Usage: {avg_cpu:.2f}%")
+
+    with open("resource_log.txt", "w") as log:
+        log.write(f"Total Processing Time: {elapsed_time:.2f}s\n")
+        log.write(f"Real-Time Factor: {real_time_factor:.2f}\n")
+        log.write(f"Avg Latency per Result: {avg_latency:.2f}s\n")
+        log.write(f"Peak Memory: {peak_memory:.2f} MB\n")
+        log.write(f"Average CPU: {avg_cpu:.2f}%\n")
 
 def main():
     client = speech.SpeechClient()
@@ -96,7 +133,6 @@ def main():
 
         responses = client.streaming_recognize(streaming_config, requests)
         listen_print_loop(responses, output_file="live_transcript.txt")
-
 
 if __name__ == "__main__":
     main()
