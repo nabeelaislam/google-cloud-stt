@@ -1,0 +1,3 @@
+{"latency": -3.41, "cpu": 1.9}
+{"latency": -3.34, "cpu": 1.6}
+{"latency": -3.35, "cpu": 1.7}
