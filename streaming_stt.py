@@ -85,7 +85,7 @@ def listen_print_loop(responses, output_file=TRANSCRIPT_FILE):
                 if result.is_final:
                     now = time.time()
                     audio_duration = result.result_end_time.total_seconds()
-                    latency = now - session_start - audio_duration
+                    latency = now - (session_start + audio_duration)
                     cpu = process.cpu_percent(interval=None)
 
                     print(f"✅ Final: {transcript}")
